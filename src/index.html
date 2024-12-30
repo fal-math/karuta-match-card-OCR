@@ -1,59 +1,120 @@
-<!doctype html>
-
-<html>
-    <head>
-        <!-- Recommended meta tags -->
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width,initial-scale=1.0">
-
-        <!-- PyScript CSS -->
-        <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
-
-        <!-- This script tag bootstraps PyScript -->
-        <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
-
-        <style>
-            #loading { outline: none; border: none; background: transparent }
-        </style>
-        <script type="module">
-            const loading = document.getElementById('loading');
-            addEventListener('py:ready', () => loading.close());
-            loading.showModal();
-        </script>
-
-        <title>>PyScriptでFour Keysの可視化</title>
-        <style>
-           .grid-container {
-                display: grid;
-                grid-template-columns: repeat(2, 1fr);
-                gap: 20px;
-                width: 90%;
-                margin: auto;
-                padding: 20px;
-            }
-            .chart-container {
-                width: 100%;
-                height: auto;
-            }
-        </style>
-    </head>
-
-    <body>
-        <dialog id="loading">
-            <h1>Loading...</h1>
-        </dialog>
-        
-        <h1>Four Keys 指標の可視化</h1>
-        <div class="grid-container">
-            <div class="chart-container" id="deploy-frequency"></div>
-            <div class="chart-container" id="lead-time"></div>
-            <div class="chart-container" id="change-failure-rate"></div>
-            <div class="chart-container" id="time-to-restore"></div>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>対戦カードデータ化ツール</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        #image-preview img {
+            max-width: 300px;  /* プレビュー画像サイズを縮小 */
+            max-height: 300px;
+            border: 1px solid #ccc;
+            margin: 10px 0;
+        }
+        #loading {
+            display: none;
+            font-size: 1.2em;
+            color: #007bff;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>対戦カード データ化ツール</h1>
+    <form>
+        <label for="practice-date">練習日を入力:</label>
+        <input type="date" id="practice-date" required>
+        <button type="button" onclick="loadImages()">画像フォルダを読み込み</button>
+    </form>
+    
+    <div id="progress">
+        <p id="progress-text">0/0 枚目実行中</p>
+    </div>
+    
+    <div id="loading">OCRを実行中...お待ちください</div>
+    
+    <div id="ocr-area">
+        <div id="image-preview">
+            <img id="preview" src="" alt="画像プレビュー">
         </div>
+        <div id="ocr-result">
+            <textarea id="correct-text" rows="10" cols="30" placeholder="文字認識結果がここに表示されます"></textarea>
+        </div>
+    </div>
+    
+    <button type="button" onclick="nextImage()">次の画像へ</button>
+    <button type="button" onclick="exportCSV()">CSV出力</button>
 
-        <script type="py" src="./main.py" config="./pyscript.toml"></script>
-       
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/2.1.4/tesseract.min.js"></script>
+    <script>
+        let images = [];
+        let currentIndex = 0;
 
-    </body>
+        function loadImages() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.multiple = true;
+            input.onchange = e => {
+                images = Array.from(e.target.files);
+                currentIndex = 0;
+                updateProgress();
+                processImage();
+            };
+            input.click();
+        }
 
+        function processImage() {
+            if (currentIndex >= images.length) {
+                alert('すべての画像の処理が完了しました。');
+                document.getElementById('loading').style.display = 'none';
+                return;
+            }
+            const file = images[currentIndex];
+            const reader = new FileReader();
+            reader.onload = () => {
+                document.getElementById('preview').src = reader.result;
+                document.getElementById('loading').style.display = 'block';
+                recognizeText(reader.result);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function recognizeText(imageSrc) {
+            Tesseract.recognize(
+                imageSrc,
+                'jpn',
+                {
+                    logger: m => console.log(m)
+                }
+            ).then(({ data: { text } }) => {
+                document.getElementById('correct-text').value = text;
+                document.getElementById('loading').style.display = 'none';
+            });
+        }
+
+        function nextImage() {
+            currentIndex++;
+            updateProgress();
+            processImage();
+        }
+
+        function updateProgress() {
+            const progressText = `${currentIndex + 1}/${images.length} 枚目実行中`;
+            document.getElementById('progress-text').innerText = progressText;
+        }
+
+        function exportCSV() {
+            let text = document.getElementById('correct-text').value;
+            let csvContent = 'data:text/csv;charset=utf-8,' + encodeURIComponent(text);
+            let link = document.createElement('a');
+            link.setAttribute('href', csvContent);
+            link.setAttribute('download', 'result.csv');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
 </html>
